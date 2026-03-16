@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v=1.0.2">
 </head>
 <body>
   <!-- Fond animé -->
@@ -71,6 +71,37 @@
                 <span class="cursus-icon">🏆</span>
                 <span class="cursus-label">Mastère RH</span>
                 <span class="cursus-sublabel">Bac +5</span>
+              </div>
+            </label>
+            <label class="cursus-card" id="card-continue">
+              <input type="radio" name="cursus" value="Formation continue">
+              <div class="cursus-content">
+                <span class="cursus-icon">💼</span>
+                <span class="cursus-label">Formation continue</span>
+                <span class="cursus-sublabel">Pro</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Sélection Durée -->
+        <div class="form-group">
+          <label>Durée de la séance <span class="required">*</span></label>
+          <div class="cursus-options">
+            <label class="cursus-card">
+              <input type="radio" name="duree" value="Demie journée" checked>
+              <div class="cursus-content">
+                <span class="cursus-icon">🌅</span>
+                <span class="cursus-label">Demie journée</span>
+                <span class="cursus-sublabel">3h30</span>
+              </div>
+            </label>
+            <label class="cursus-card">
+              <input type="radio" name="duree" value="Journée">
+              <div class="cursus-content">
+                <span class="cursus-icon">☀️</span>
+                <span class="cursus-label">Journée</span>
+                <span class="cursus-sublabel">7h00</span>
               </div>
             </label>
           </div>
@@ -157,11 +188,12 @@
     <div class="status-bar" id="status-bar">
       <span class="status-dot"></span>
       <span id="status-text">Vérification du système...</span>
+      <span style="opacity: 0.5; font-size: 10px; margin-left: auto;">v1.0.2</span>
       <button class="status-check" onclick="verifierStatut()" aria-label="Rafraîchir le statut">↻</button>
     </div>
 
   </main>
 
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=1.0.2"></script>
 </body>
 </html>

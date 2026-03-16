@@ -77,9 +77,17 @@ inner-zenith/
 
 ## Déploiement Vercel
 
-```bash
-vercel --prod
-```
+Pour déployer sur Vercel :
+1. Pousser le code sur GitHub (en excluant les fichiers sensibles via `.gitignore`).
+2. Créer un nouveau projet sur le Dashboard Vercel.
+3. Ajouter les variables d'environnement suivantes :
+   - `GEMINI_API_KEY` : Votre clé API.
+   - `GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT` : Le contenu complet du fichier `service_account.json`.
+   - `DRIVE_FOLDER_FICHES` : ID du dossier Drive.
+   - `DRIVE_MODELE_DOC_ID` : ID du Doc modèle.
+   - `VERCEL` : `1` (Détection auto activée).
+
+L'application est configurée pour utiliser `api/index.py` comme point d'entrée serverless.
 
 ## Auteur
 

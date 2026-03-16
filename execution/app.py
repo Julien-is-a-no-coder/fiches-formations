@@ -12,9 +12,10 @@ import sys
 import tempfile
 import shutil
 
-# Forcer l'encodage UTF-8 pour les logs Windows
-if sys.stdout.encoding != "utf-8":
-    sys.stdout.reconfigure(encoding="utf-8")
+# Configuration des logs
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from pathlib import Path
 from flask import Flask, request, jsonify, render_template
@@ -29,8 +30,12 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from pdf_analyzer import extraire_texte_pdf
 from fiche_generator import generer_fiche_revision, valider_fiche
-from drive_manager import copier_modele_vers_dossier
-from google_docs_builder import remplir_google_doc, construire_nom_fichier
+from drive_manager import (
+    verifier_connexion, telecharger_modele, uploader_vers_drive_et_convertir
+)
+from google_docs_builder import (
+    construire_nom_fichier, remplir_docx_local
+)
 
 # --- Initialisation Flask ---
 app = Flask(
@@ -46,8 +51,12 @@ MAX_PDF_SIZE_MB = int(os.getenv("MAX_PDF_SIZE_MB", 200))
 app.config["MAX_CONTENT_LENGTH"] = MAX_PDF_SIZE_MB * 1024 * 1024
 
 # Dossier de logs/sorties temporaires
-DOSSIER_SORTIES = Path(__file__).parent.parent / "sorties"
-DOSSIER_SORTIES.mkdir(exist_ok=True)
+# Sur Vercel, seul /tmp est accessible en écriture
+if os.environ.get("VERCEL"):
+    DOSSIER_SORTIES = Path("/tmp")
+else:
+    DOSSIER_SORTIES = Path(__file__).parent.parent / "sorties"
+    DOSSIER_SORTIES.mkdir(exist_ok=True)
 
 
 # ─────────────────────────────────────────────
@@ -62,30 +71,15 @@ def index():
 
 @app.route("/api/generer", methods=["POST"])
 def generer():
-    """
-    Pipeline principal : PDF → extraction → génération IA → création Google Doc.
-
-    Formulaire attendu :
-        intitule (str)  : Intitulé de la séance de formation
-        date (str)      : Date de la session (YYYY-MM-DD)
-        cursus (str)    : "Bachelor RH" ou "Mastère RH"
-        pdf (file)      : Fichier PDF du support de formation
-
-    Retourne:
-        JSON: {
-            "succes": bool,
-            "etapes": list[dict],     → Progression étape par étape
-            "lien_doc": str,          → Lien vers le Google Doc créé
-            "nom_fichier": str,       → Nom du fichier créé
-            "apercu_fiche": dict      → Aperçu de la fiche (premiers éléments)
-        }
-    """
+    """Pipeline principal : PDF → extraction → génération IA → création Google Doc."""
+    print("\n🚀 [V2] Démarrage de la génération (Méthode Local Processing)...")
     etapes = []
 
     # --- 1. Validation des données ---
     intitule = request.form.get("intitule", "").strip()
     date = request.form.get("date", "").strip()
     cursus = request.form.get("cursus", "Bachelor RH").strip()
+    duree = request.form.get("duree", "Demie journée").strip()
 
     if not intitule:
         return jsonify({"succes": False, "erreur": "L'intitulé de la séance est requis."}), 400
@@ -93,9 +87,13 @@ def generer():
     if not date:
         return jsonify({"succes": False, "erreur": "La date de la séance est requise."}), 400
 
-    cursus_valides = ["Bachelor RH", "Mastère RH"]
+    cursus_valides = ["Bachelor RH", "Mastère RH", "Formation continue"]
     if cursus not in cursus_valides:
         cursus = "Bachelor RH"
+
+    duree_valides = ["Demie journée", "Journée"]
+    if duree not in duree_valides:
+        duree = "Demie journée"
 
     if "pdf" not in request.files or not request.files["pdf"].filename:
         return jsonify({"succes": False, "erreur": "Le fichier PDF du support est requis."}), 400
@@ -134,7 +132,7 @@ def generer():
 
         # --- 4. Génération IA de la fiche ---
         print("🤖 Génération de la fiche de révision avec Gemini...")
-        fiche_brute = generer_fiche_revision(contenu, intitule, cursus, date)
+        fiche_brute = generer_fiche_revision(contenu, intitule, cursus, date, duree)
         fiche = valider_fiche(fiche_brute)
 
         nb_concepts = len(fiche.get("concepts_cles", []))
@@ -145,32 +143,60 @@ def generer():
             "detail": f"{nb_concepts} concepts-clés, {nb_cas} cas pratique(s)"
         })
 
-        # --- 5. Copie du modèle Google Doc ---
-        print("📄 Copie du modèle Google Doc...")
+        # --- 5. Préparation du document final ---
+        print("📄 Préparation du document final...")
         nom_fichier = construire_nom_fichier(cursus, intitule, date)
-        doc_info = copier_modele_vers_dossier(nom_fichier)
+        
+        # Chemins temporaires pour le traitement local
+        BASE_DIR = Path(__file__).parent.parent
+        chemin_modele_temp = temp_dir / "temp_modele.docx"
+        chemin_final_temp = temp_dir / "temp_final.docx"
+
+        # A. Téléchargement du modèle
+        from drive_manager import MODELE_DOC_ID
+        telecharger_modele(MODELE_DOC_ID, str(chemin_modele_temp))
+        
+        # B. Remplissage local
+        remplir_docx_local(
+            str(chemin_modele_temp),
+            str(chemin_final_temp),
+            fiche,
+            intitule,
+            date,
+            cursus
+        )
+
+        # C. Upload et conversion
+        doc_info = uploader_vers_drive_et_convertir(
+            str(chemin_final_temp),
+            nom_fichier
+        )
+        
         doc_id = doc_info["id"]
         etapes.append({
             "etape": "Google Doc créé",
             "statut": "✅",
-            "detail": nom_fichier
+            "detail": f"ID: {doc_id[:10]}..."
         })
 
-        # --- 6. Remplissage du Google Doc ---
-        print("✍️  Remplissage du contenu dans le Google Doc...")
-        remplir_google_doc(doc_id, fiche, intitule, date, cursus)
+        # Nettoyage des fichiers docx temporaires
+        if chemin_modele_temp.exists(): chemin_modele_temp.unlink()
+        if chemin_final_temp.exists(): chemin_final_temp.unlink()
+
+        # Succès final
         etapes.append({
-            "etape": "Contenu inséré",
+            "etape": "Finalisation",
             "statut": "✅",
-            "detail": "Tous les champs remplis"
+            "detail": "Document rempli et prêt"
         })
 
         # --- Réponse finale ---
+        # On adapte l'aperçu aux nouvelles clés du JSON
         apercu_fiche = {
-            "objectifs": fiche.get("objectifs_seance", [])[:3],
-            "concepts": fiche.get("concepts_cles", [])[:3],
-            "points_essentiels": fiche.get("points_essentiels", [])[:5],
-            "a_des_cas_pratiques": len(fiche.get("cas_pratiques", [])) > 0,
+            "objectifs": fiche.get("les_objectifs", [])[:4],
+            "concepts": [s.get("titre") for s in fiche.get("sections_principales", [])[:3]],
+            "points_essentiels": [fiche.get("l_essentiel", "")] if fiche.get("l_essentiel") else [],
+            "a_des_cas_pratiques": fiche.get("cas_pratique", {}).get("afficher", False),
         }
 
         reponse = {
@@ -202,16 +228,24 @@ def generer():
 @app.route("/api/statut")
 def statut():
     """Vérifie que le serveur et les dépendances sont opérationnels."""
+    # Racine du projet (un niveau au-dessus de /execution/)
+    racine = Path(__file__).parent.parent
     gemini_ok = bool(os.getenv("GEMINI_API_KEY"))
     sa_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
-    sa_fichier = Path("./service_account.json").exists()
+    sa_fichier = (racine / "service_account.json").exists()
+    token_pickle = (racine / "token.pickle").exists()
+    credentials_json = (racine / "credentials.json").exists()
 
     if sa_env:
-        drive_statut = "✅ Via variable d'environnement"
+        drive_statut = "✅ Via variable d'environnement (Service Account)"
     elif sa_fichier:
         drive_statut = "✅ service_account.json présent"
+    elif token_pickle and credentials_json:
+        drive_statut = "✅ OAuth2 (credentials.json + token.pickle)"
+    elif credentials_json:
+        drive_statut = "⚠️ credentials.json présent — token.pickle manquant"
     else:
-        drive_statut = "❌ service_account.json manquant"
+        drive_statut = "❌ Aucune configuration Google trouvée"
 
     statuts = {
         "serveur": "✅ En ligne",

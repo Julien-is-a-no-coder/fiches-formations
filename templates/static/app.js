@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initialiserUpload();
   initialiserFormulaire();
   initialiserCursusCards();
+  initialiserDureeCards();
   verifierStatut();
 });
 
@@ -29,6 +30,29 @@ function initialiserDate() {
 /** Gestion des cards de sélection de cursus */
 function initialiserCursusCards() {
   const radioButtons = document.querySelectorAll('input[name="cursus"]');
+
+  function mettreAJourCards() {
+    radioButtons.forEach(radio => {
+      const card = radio.closest(".cursus-card");
+      if (radio.checked) {
+        card.classList.add("selected");
+      } else {
+        card.classList.remove("selected");
+      }
+    });
+  }
+
+  radioButtons.forEach(radio => {
+    radio.addEventListener("change", mettreAJourCards);
+  });
+
+  mettreAJourCards(); // État initial
+}
+
+
+/** Gestion des cards de sélection de durée */
+function initialiserDureeCards() {
+  const radioButtons = document.querySelectorAll('input[name="duree"]');
 
   function mettreAJourCards() {
     radioButtons.forEach(radio => {
@@ -238,17 +262,17 @@ function afficherResultats(donnees) {
     `;
   }
 
-  // Concepts-clés
+  // Concepts-clés (Nouvelle structure : liste de titres ou texte simple)
   const blocConcepts = document.getElementById("apercu-concepts");
   if (apercu.concepts && apercu.concepts.length > 0) {
     blocConcepts.innerHTML = `
-      <h4>💡 Concepts-clés</h4>
-      <ul>${apercu.concepts.map(c => `
-        <li>
-          <span class="concept-terme">${htmlEchapper(c.terme)}</span><br>
-          <span class="concept-def">${htmlEchapper(c.definition)}</span>
-        </li>`).join("")}
-      </ul>
+      <h4>💡 Concepts-clés / Sections</h4>
+      <ul>${apercu.concepts.map(c => {
+        if (typeof c === 'object' && c !== null) {
+          return `<li><span class="concept-terme">${htmlEchapper(c.terme || "")}</span><br><span class="concept-def">${htmlEchapper(c.definition || "")}</span></li>`;
+        }
+        return `<li>${htmlEchapper(c)}</li>`;
+      }).join("")}</ul>
     `;
   }
 

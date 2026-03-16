@@ -187,27 +187,32 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cur
 /* ── Sélecteur cursus ── */
 .cursus-options {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
 }
 
 .cursus-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   cursor: pointer;
 }
 .cursus-card input[type="radio"] { display: none; }
 
 .cursus-content {
+  flex: 1;
   background: rgba(255, 255, 255, 0.04);
   border: 2px solid var(--border);
   border-radius: 14px;
-  padding: 16px 12px;
+  padding: 16px 8px;
   text-align: center;
   transition: all 0.25s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  min-height: 100px; /* Force une hauteur minimale pour l'équilibre */
 }
 .cursus-card:hover .cursus-content {
   border-color: rgba(99, 179, 237, 0.4);
@@ -219,8 +224,8 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.8); cur
   box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.15), inset 0 1px 0 rgba(255,255,255,0.1);
 }
 
-.cursus-icon { font-size: 24px; margin-bottom: 4px; }
-.cursus-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.cursus-icon { font-size: 24px; margin-bottom: 2px; }
+.cursus-label { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
 .cursus-sublabel { font-size: 11px; color: var(--text-muted); }
 
 /* ── Zone d'upload ── */

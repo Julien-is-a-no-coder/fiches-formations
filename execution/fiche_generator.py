@@ -40,7 +40,8 @@ def generer_fiche_revision(
     contenu_pdf: str,
     intitule_seance: str,
     cursus: str,
-    date: str
+    date: str,
+    duree: str = "Demie journée"
 ) -> dict:
     """
     Génère une fiche de révision complète à partir du contenu PDF de la formation.
@@ -50,6 +51,7 @@ def generer_fiche_revision(
         intitule_seance (str): Intitulé de la séance de formation
         cursus (str): "Bachelor RH" ou "Mastère RH"
         date (str): Date de la séance (format YYYY-MM-DD ou DD/MM/YYYY)
+        duree (str): "Demie journée" (3h30) ou "Journée" (7h00)
 
     Retourne:
         dict: {
@@ -59,12 +61,9 @@ def generer_fiche_revision(
             "points_essentiels": list[str],
             "ressources_pedagogiques": list[str],
             "cas_pratiques": list[dict(titre, description, consigne)],
-            "points_vigilance": list[str]
+            "points_vigilance": list[str],
+            "deroule_pedagogique": str
         }
-
-    Lève:
-        RuntimeError: Si la génération Gemini échoue
-        ValueError: Si la clé API n'est pas configurée
     """
     if not GEMINI_API_KEY:
         raise ValueError(
@@ -88,6 +87,7 @@ INFORMATIONS DE LA SÉANCE :
 - Intitulé : {intitule_seance}
 - Cursus : {cursus}
 - Date : {date}
+- Durée prévue : {duree} (Note : Adapte la profondeur du contenu et du déroulé à cette durée)
 
 SUPPORT DE FORMATION (contenu extrait du PDF) :
 {contenu_tronque}
@@ -95,48 +95,55 @@ SUPPORT DE FORMATION (contenu extrait du PDF) :
 ---
 
 INSTRUCTIONS IMPÉRATIVES :
-1. Analyse attentivement tout le contenu du support pour identifier les enseignements clés.
-2. Développe chaque section de manière substantielle — évite les formulations vagues ou génériques.
-3. Les concepts-clés doivent être précis, définis avec une formulation claire et mémorisable.
-4. La synthèse doit être rédigée en paragraphes fluides (pas de liste à puces), couvrant l'essentiel de la séance.
-5. Les points essentiels doivent être formulés comme des affirmations claires et mémorisables (max 15 mots chacun).
-6. Pour les ressources pédagogiques : cite uniquement celles mentionnées dans le support (outils, articles, livres, sites) — sinon laisse vide.
-7. Pour les cas pratiques : décris uniquement les exercices/mises en situation effectivement présents dans le PDF — sinon laisse la liste vide.
-8. Les points de vigilance = erreurs courantes ou points de confusion à anticiper pour les étudiants.
+1. SYNTHÈSE PÉDAGOGIQUE & VARIATION : Ne fais pas qu'une simple liste de points (bullet points). Alterne les formats pour maintenir l'engagement : utilise des paragraphes narratifs pour expliquer des contextes, des listes pour les étapes, et des tableaux pour les comparaisons. Agis en vrai concepteur.
+2. Structure ta réponse pour qu'elle ressemble à une vraie fiche de révision de Mastère RH (très synthétique, focus sur l'essentiel, orientée terrain et action).
+3. Utilise la structure "sections_principales" pour découper le contenu en grands thèmes. Pour chaque thème, développe une explication courte (2-3 phrases) dans "chapeau_introductif" et varie les points clés.
+4. Création de Tableaux : Dès que tu identifies une liste de caractéristiques, de profils avec des solutions, ou des concepts opposables, génère des données pour un "tableau_comparatif". C'est crucial pour la lisibilité !
+5. Pour le cas pratique, sois précis : donne le contexte, les faits saillants, et les résultats ou livrables attendus (sous forme de listes courtes).
+6. Points de vigilance & Ressources : Identifie les risques majeurs. Pour les ressources, n'extrais que les URLs et liens RÉELLEMENT présents dans le document source. NE GÉNÈRE AUCUN LIEN FICTIF. Si l'URL n'est pas écrite, ne l'invente pas. Formate-les en markdown [Nom du site/doc](URL).
+7. INTERDICTION ABSOLUE D'UTILISER DES EMOJIS : Ce document est un support officiel. Ne génère AUCUN émoji.
+8. CITATIONS : Si tu dois citer un texte ou une loi, utilise des guillemets simples (exemple : 'Loi du 24 octobre') ou des guillemets français (« »).
+9. RESPECT DE LA LANGUE FRANÇAISE : N'utilise pas de majuscules inutiles. Seules les majuscules de début de phrase et de noms propres sont autorisées.
+10. SOBRIÉTÉ : Évite les superlatifs et les phrases de remplissage. Chaque mot doit avoir une valeur pédagogique.
 
-RÉPONDS UNIQUEMENT avec un JSON valide, sans markdown, sans explication, au format EXACT suivant :
+RÉPONDS UNIQUEMENT avec un JSON valide, sans markdown au format EXACT suivant :
 {{
-  "objectifs_seance": [
-    "Objectif pédagogique 1 (verbe d'action + compétence visée)",
-    "Objectif pédagogique 2",
-    "Objectif pédagogique 3"
-  ],
-  "concepts_cles": [
+  "l_essentiel": "1 paragraphe très fort (max 4 phrases) résumant la vision globale ou la posture clé que l'apprenant doit retenir.",
+  "les_objectifs": [ "La compétence visée 1", "La compétence visée 2" ],
+  "sections_principales": [
     {{
-      "terme": "Nom du concept",
-      "definition": "Définition claire et précise en 1-2 phrases"
+      "titre": "1. Titre de la section (ex: Le Diagnostic RH)",
+      "chapeau_introductif": "Phrase courte d'introduction du thème (optionnelle).",
+      "points_cles": [
+        "Traiter les faits : analyser la qualité, les délais plutôt que porter un jugement.",
+        "Sécuriser : garantir la conformité à l'Art L1132-1."
+      ],
+      "tableau_comparatif": {{
+        "afficher": true,
+        "titre_tableau": "Comparatif des profils",
+        "entetes": ["Profil", "Risques ou Obstacles", "Leviers et Solutions"],
+        "lignes": [
+          ["TDAH", "Interruptions fréquentes, perte de focus", "Méthodologie Pomodoro, isolation"],
+          ["HPI", "Ennui rapide, besoin de sens", "Délégation de projets complexes"]
+        ]
+      }},
+      "conseil_expert": "Privilégier toujours l'approche fonctionnelle plutôt que médicale pour éviter de stigmatiser."
     }}
   ],
-  "synthese_contenu": "Synthèse rédigée en 3-5 paragraphes couvrant l'ensemble du contenu abordé pendant la séance...",
-  "points_essentiels": [
-    "Point essentiel 1 : affirmation mémorisable",
-    "Point essentiel 2",
-    "Point essentiel 3"
-  ],
-  "ressources_pedagogiques": [
-    "Ressource 1 (outil / article / livre mentionné dans le support)",
-    "Ressource 2"
-  ],
-  "cas_pratiques": [
-    {{
-      "titre": "Nom du cas pratique",
-      "description": "Description du contexte et des objectifs de l'exercice",
-      "consigne": "Instructions données aux participants"
-    }}
-  ],
-  "points_vigilance": [
-    "Point de vigilance 1 : erreur ou confusion fréquente à éviter",
-    "Point de vigilance 2"
+  "cas_pratique": {{
+    "afficher": true,
+    "titre_atelier": "Atelier : Restitution Croisée",
+    "organisation_livrables": ["Constituer des groupes de 3", "Produire une grille d'entretien"],
+    "situations": [
+      {{
+        "nom_situation": "Cas A : Le collaborateur désengagé",
+        "faits_et_attendus": "Faits : retards depuis 1 mois. Attendu : plan de relance motivation."
+      }}
+    ]
+  }},
+  "points_vigilance_et_ressources": [
+    "Vigilance : ne jamais interroger sur des données de santé.",
+    "Ressource : Guide du Défenseur des Droits."
   ]
 }}
 """
@@ -146,16 +153,18 @@ RÉPONDS UNIQUEMENT avec un JSON valide, sans markdown, sans explication, au for
         reponse = modele.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
-                temperature=0.7,
+                temperature=0.3, # Baisse de la créativité pour plus de stabilité JSON
                 max_output_tokens=8192,
+                response_mime_type="application/json",
             )
         )
         texte = reponse.text.strip()
 
-        # Nettoyage du JSON (suppression des balises markdown si présentes)
-        texte = re.sub(r"^```json\s*", "", texte)
-        texte = re.sub(r"```\s*$", "", texte)
-        texte = texte.strip()
+        # En principe response_mime_type garantit un JSON pur, mais sécurité supplémentaire :
+        if texte.startswith("```json"):
+            texte = texte[7:].strip()
+        if texte.endswith("```"):
+            texte = texte[:-3].strip()
 
         fiche = json.loads(texte)
         return fiche
@@ -171,23 +180,19 @@ RÉPONDS UNIQUEMENT avec un JSON valide, sans markdown, sans explication, au for
 
 def valider_fiche(fiche: dict) -> dict:
     """
-    Valide et normalise la structure de la fiche générée.
-    Garantit que toutes les clés attendues sont présentes.
-
-    Paramètres:
-        fiche (dict): Fiche brute retournée par Gemini
-
-    Retourne:
-        dict: Fiche normalisée avec valeurs par défaut si nécessaire
+    Valide et normalise la structure de la nouvelle fiche générée.
     """
     defaults = {
-        "objectifs_seance": [],
-        "concepts_cles": [],
-        "synthese_contenu": "",
-        "points_essentiels": [],
-        "ressources_pedagogiques": [],
-        "cas_pratiques": [],
-        "points_vigilance": [],
+        "l_essentiel": "Aucune information essentielle n'a été extraite.",
+        "les_objectifs": [],
+        "sections_principales": [],
+        "cas_pratique": {
+            "afficher": False, 
+            "titre_atelier": "", 
+            "organisation_livrables": [], 
+            "situations": []
+        },
+        "points_vigilance_et_ressources": []
     }
 
     for cle, valeur_defaut in defaults.items():

@@ -1,15 +1,15 @@
 """
 Module : drive_manager.py
-Description : Gestion de l'authentification Google et des opérations sur Google Drive.
-Utilise un Service Account JSON (compatible Vercel/serverless).
+Description : Gestion de l'authentification Google et des opérations sur Google Drive/Docs.
+Utilise OAuth2 en local (credentials.json + token.pickle)
+et Service Account en production Vercel (GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT).
 """
 
 import os
 import json
+import pickle
 from pathlib import Path
 from dotenv import load_dotenv
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 
 load_dotenv()
 
@@ -19,42 +19,73 @@ SCOPES = [
     "https://www.googleapis.com/auth/documents",
 ]
 
-# Configuration via variables d'environnement
-SERVICE_ACCOUNT_PATH = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service_account.json")
+# Chemins de configuration
+CREDENTIALS_PATH = os.getenv("GOOGLE_CREDENTIALS_PATH", "./credentials.json")
+TOKEN_PATH = os.getenv("GOOGLE_TOKEN_PATH", "./token.pickle")
+
+# Configuration Drive
 FOLDER_FICHES = os.getenv("DRIVE_FOLDER_FICHES", "1t7JnOY1hO0cMwcCfqLc44eJJ_Mnz--LO")
 MODELE_DOC_ID = os.getenv("DRIVE_MODELE_DOC_ID", "1Ekwki-f3xkUNOyfxd0319GVi7f1g-go6")
 
 
 def _obtenir_credentials():
     """
-    Obtient les credentials Google via Service Account JSON.
-    Supporte à la fois un fichier local et une variable d'environnement JSON.
+    Obtient les credentials Google.
+    Priorité :
+      1. Service Account JSON (variable d'env — production Vercel)
+      2. OAuth2 token.pickle + credentials.json (développement local)
 
     Retourne:
-        google.oauth2.service_account.Credentials
+        google credentials
 
     Lève:
-        FileNotFoundError: Si le fichier service_account.json est absent
-        ValueError: Si la configuration est invalide
+        FileNotFoundError: Si aucune configuration n'est trouvée
     """
-    # Option 1 : Variable d'environnement contenant le JSON directement (pour Vercel)
+    # --- Option 1 : Service Account (Vercel) ---
     sa_json_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
     if sa_json_env:
-        try:
-            sa_info = json.loads(sa_json_env)
-            return service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Variable GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT invalide : {e}") from e
+        from google.oauth2 import service_account
+        sa_info = json.loads(sa_json_env)
+        return service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
 
-    # Option 2 : Fichier JSON local (développement)
-    chemin = Path(SERVICE_ACCOUNT_PATH)
-    if not chemin.exists():
-        raise FileNotFoundError(
-            f"Service Account JSON introuvable : {SERVICE_ACCOUNT_PATH}\n"
-            "Créez un Service Account sur https://console.cloud.google.com/iam-admin/serviceaccounts\n"
-            "Téléchargez la clé JSON et placez-la à la racine du projet."
-        )
-    return service_account.Credentials.from_service_account_file(str(chemin), scopes=SCOPES)
+    sa_fichier = Path(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service_account.json"))
+    if sa_fichier.exists():
+        from google.oauth2 import service_account
+        return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
+
+    # --- Option 2 : OAuth2 local (credentials.json + token.pickle) ---
+    from google.oauth2.credentials import Credentials
+    from google_auth_oauthlib.flow import InstalledAppFlow
+    from google.auth.transport.requests import Request
+
+    creds = None
+
+    # Charger le token sauvegardé
+    token = Path(TOKEN_PATH)
+    if token.exists():
+        with open(str(token), "rb") as f:
+            creds = pickle.load(f)
+
+    # Rafraîchir ou re-authentifier si nécessaire
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            credentials_path = Path(CREDENTIALS_PATH)
+            if not credentials_path.exists():
+                raise FileNotFoundError(
+                    f"Aucune configuration Google trouvée.\n"
+                    f"Attendu : credentials.json à '{CREDENTIALS_PATH}'\n"
+                    "Consultez le README pour configurer l'accès Google."
+                )
+            flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
+            creds = flow.run_local_server(port=0)
+
+        # Sauvegarder le token
+        with open(TOKEN_PATH, "wb") as f:
+            pickle.dump(creds, f)
+
+    return creds
 
 
 def obtenir_service_drive():
@@ -64,6 +95,7 @@ def obtenir_service_drive():
     Retourne:
         Resource: Service Google Drive API v3
     """
+    from googleapiclient.discovery import build
     creds = _obtenir_credentials()
     return build("drive", "v3", credentials=creds)
 
@@ -75,6 +107,7 @@ def obtenir_service_docs():
     Retourne:
         Resource: Service Google Docs API v1
     """
+    from googleapiclient.discovery import build
     creds = _obtenir_credentials()
     return build("docs", "v1", credentials=creds)
 
@@ -85,29 +118,13 @@ def copier_modele_vers_dossier(
     modele_id: str | None = None
 ) -> dict:
     """
-    Copie le Google Doc modèle dans le dossier cible et le renomme.
-
-    Paramètres:
-        nom_fichier (str): Nom du nouveau document (ex: "Bachelor RH-IA pour les RH-16-03-2026")
-        dossier_id (str|None): ID du dossier Drive cible (défaut: FOLDER_FICHES)
-        modele_id (str|None): ID du Google Doc modèle (défaut: MODELE_DOC_ID)
-
-    Retourne:
-        dict: {
-            "id": str,          → ID du nouveau Google Doc
-            "nom": str,         → Nom du fichier
-            "lien_web": str,    → Lien d'édition Google Docs
-            "lien_partage": str → Lien de partage direct
-        }
-
-    Lève:
-        RuntimeError: Si la copie échoue
+    OBSOLÈTE : Cette fonction copiait directement sur Drive. 
+    Préférer telecharger_modele + modification locale + uploader_vers_drive_et_convertir.
     """
     folder = dossier_id or FOLDER_FICHES
     modele = modele_id or MODELE_DOC_ID
     service = obtenir_service_drive()
 
-    # Métadonnées pour la copie
     corps = {
         "name": nom_fichier,
         "parents": [folder],
@@ -133,6 +150,82 @@ def copier_modele_vers_dossier(
         ) from e
 
 
+def telecharger_modele(file_id: str, chemin_destination: str) -> str:
+    """
+    Télécharge un fichier modèle depuis Google Drive.
+    Si c'est un Google Doc, l'exporte en .docx.
+    """
+    from googleapiclient.http import MediaIoBaseDownload
+    import io
+    service = obtenir_service_drive()
+
+    path = Path(chemin_destination)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        # Essayer d'abord le téléchargement direct (si c'est déjà un .docx)
+        request = service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+    except Exception as e:
+        # Si échec, c'est probablement un Google Doc natif -> export
+        request = service.files().export_media(
+            fileId=file_id,
+            mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+
+    with open(str(path), "wb") as f:
+        f.write(fh.getvalue())
+    return str(path)
+
+
+def uploader_vers_drive_et_convertir(
+    chemin_local: str,
+    nom_destination: str,
+    dossier_id: str | None = None
+) -> dict:
+    """
+    Upload un .docx local vers Drive et le convertit en Google Doc natif.
+    """
+    from googleapiclient.http import MediaFileUpload
+    folder = dossier_id or FOLDER_FICHES
+    service = obtenir_service_drive()
+
+    metadata = {
+        "name": nom_destination,
+        "parents": [folder],
+        "mimeType": "application/vnd.google-apps.document"  # Force la conversion
+    }
+
+    media = MediaFileUpload(
+        chemin_local,
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        resumable=False
+    )
+
+    fichier = service.files().create(
+        body=metadata,
+        media_body=media,
+        fields="id,name,webViewLink"
+    ).execute()
+
+    file_id = fichier.get("id")
+    return {
+        "id": file_id,
+        "nom": fichier.get("name"),
+        "lien_web": fichier.get("webViewLink"),
+        "lien_partage": f"https://docs.google.com/document/d/{file_id}/edit",
+    }
+
+
 def verifier_connexion() -> dict:
     """
     Vérifie que l'authentification Drive fonctionne et que les ressources sont accessibles.
@@ -142,15 +235,14 @@ def verifier_connexion() -> dict:
     """
     resultats = {}
 
-    # Test connexion Drive
     try:
         service = obtenir_service_drive()
         # Vérifier accès au dossier cible
-        service.files().get(fileId=FOLDER_FICHES, fields="id,name").execute()
+        dossier = service.files().get(fileId=FOLDER_FICHES, fields="id,name").execute()
         resultats["drive_connexion"] = "✅ Connecté"
-        resultats["dossier_cible"] = f"✅ Accessible ({FOLDER_FICHES})"
+        resultats["dossier_cible"] = f"✅ Accessible ({dossier.get('name', FOLDER_FICHES)})"
     except FileNotFoundError as e:
-        resultats["drive_connexion"] = f"❌ Service Account absent : {e}"
+        resultats["drive_connexion"] = f"❌ Config absente : {e}"
         return resultats
     except Exception as e:
         resultats["drive_connexion"] = f"❌ Erreur : {e}"
@@ -159,8 +251,8 @@ def verifier_connexion() -> dict:
     # Test accès modèle Google Doc
     try:
         service = obtenir_service_drive()
-        service.files().get(fileId=MODELE_DOC_ID, fields="id,name").execute()
-        resultats["modele_doc"] = f"✅ Accessible ({MODELE_DOC_ID})"
+        doc = service.files().get(fileId=MODELE_DOC_ID, fields="id,name,mimeType").execute()
+        resultats["modele_doc"] = f"✅ Accessible ({doc.get('name', MODELE_DOC_ID)})"
     except Exception as e:
         resultats["modele_doc"] = f"❌ Erreur accès modèle : {e}"
 

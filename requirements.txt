@@ -1,0 +1,24 @@
+# Dépendances Python — Générateur de Fiches de Révision
+
+# Serveur web
+flask==3.1.0
+flask-cors==5.0.0
+
+# Extraction PDF
+pdfplumber==0.11.4
+pypdf==5.3.0
+
+# Génération IA (Gemini)
+google-generativeai==0.8.3
+
+# Google APIs (Drive + Docs)
+google-api-python-client==2.165.0
+google-auth==2.38.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.1
+
+# Gestion variables d'environnement
+python-dotenv==1.0.1
+
+# Utilitaires
+requests==2.32.3

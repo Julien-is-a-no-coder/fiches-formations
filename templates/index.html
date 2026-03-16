@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Générateur de Fiches de Révision</title>
+  <meta name="description" content="Analysez votre support PDF et générez automatiquement une fiche de révision synthétique dans Google Docs.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Fond animé -->
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <main class="container">
+
+    <!-- En-tête -->
+    <header class="header">
+      <div class="header-icon">📚</div>
+      <h1>Générateur de Fiches<br><span class="gradient-text">de Révision</span></h1>
+      <p class="header-sub">Importez votre support PDF et générez automatiquement une fiche de synthèse pédagogique dans Google Docs.</p>
+    </header>
+
+    <!-- Formulaire principal -->
+    <form id="form-generation" class="card form-card" enctype="multipart/form-data" novalidate>
+
+      <!-- Informations de la séance -->
+      <section class="form-section">
+        <h2 class="section-title">
+          <span class="section-icon">📋</span>
+          Informations de la séance
+        </h2>
+
+        <div class="form-group">
+          <label for="intitule">Intitulé de la séance <span class="required">*</span></label>
+          <input
+            type="text"
+            id="intitule"
+            name="intitule"
+            placeholder="ex : IA pour les Ressources Humaines"
+            required
+            autocomplete="off"
+          >
+        </div>
+
+        <div class="form-group">
+          <label for="date">Date du cours <span class="required">*</span></label>
+          <input type="date" id="date" name="date" required>
+        </div>
+
+        <div class="form-group">
+          <label>Cursus <span class="required">*</span></label>
+          <div class="cursus-options">
+            <label class="cursus-card" id="card-bachelor">
+              <input type="radio" name="cursus" value="Bachelor RH" checked>
+              <div class="cursus-content">
+                <span class="cursus-icon">🎓</span>
+                <span class="cursus-label">Bachelor RH</span>
+                <span class="cursus-sublabel">Bac +3</span>
+              </div>
+            </label>
+            <label class="cursus-card" id="card-mastere">
+              <input type="radio" name="cursus" value="Mastère RH">
+              <div class="cursus-content">
+                <span class="cursus-icon">🏆</span>
+                <span class="cursus-label">Mastère RH</span>
+                <span class="cursus-sublabel">Bac +5</span>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <div class="divider"></div>
+
+      <!-- Upload PDF -->
+      <section class="form-section">
+        <h2 class="section-title">
+          <span class="section-icon">📄</span>
+          Support de formation
+        </h2>
+
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="pdf" name="pdf" accept=".pdf" required hidden>
+          <div class="upload-placeholder" id="upload-placeholder">
+            <div class="upload-icon">📎</div>
+            <p class="upload-text">Glissez votre PDF ici<br>ou <span class="upload-link">cliquez pour sélectionner</span></p>
+            <p class="upload-hint">Support PDF — Jusqu'à 200 MB</p>
+          </div>
+          <div class="upload-preview hidden" id="upload-preview">
+            <span class="file-icon">📄</span>
+            <span class="file-name" id="file-name-display"></span>
+            <span class="file-size" id="file-size-display"></span>
+            <button type="button" class="file-remove" id="file-remove" aria-label="Supprimer">✕</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bouton génération -->
+      <button type="submit" class="btn-generate" id="btn-generate">
+        <span class="btn-text">Générer la fiche</span>
+        <span class="btn-icon">✨</span>
+      </button>
+
+    </form>
+
+    <!-- Zone de résultats -->
+    <section class="results-zone hidden" id="results-zone">
+
+      <!-- Progression -->
+      <div class="card progress-card">
+        <h3 class="progress-title">📊 Progression</h3>
+        <div class="steps-list" id="steps-list"></div>
+      </div>
+
+      <!-- Succès -->
+      <div class="card results-card hidden" id="results-card">
+        <div class="success-header">
+          <span class="success-icon">🎉</span>
+          <h3 class="results-title">Fiche créée avec succès !</h3>
+        </div>
+
+        <!-- Lien Google Docs -->
+        <a href="#" id="link-google-doc" class="btn-open-doc" target="_blank" rel="noopener noreferrer">
+          <span>📝</span>
+          <span id="nom-fichier-display">Ouvrir dans Google Docs</span>
+          <span class="btn-arrow">→</span>
+        </a>
+
+        <!-- Aperçu de la fiche -->
+        <details class="preview-section" id="apercu-section">
+          <summary>👁️ Aperçu de la fiche</summary>
+          <div class="apercu-content">
+            <div class="apercu-block" id="apercu-objectifs"></div>
+            <div class="apercu-block" id="apercu-concepts"></div>
+            <div class="apercu-block" id="apercu-points"></div>
+          </div>
+        </details>
+      </div>
+
+      <!-- Erreur -->
+      <div class="card error-card hidden" id="error-card">
+        <h3>❌ Une erreur est survenue</h3>
+        <p class="error-message" id="error-message"></p>
+        <pre class="error-trace hidden" id="error-trace"></pre>
+      </div>
+
+    </section>
+
+    <!-- Barre de statut système -->
+    <div class="status-bar" id="status-bar">
+      <span class="status-dot"></span>
+      <span id="status-text">Vérification du système...</span>
+      <button class="status-check" onclick="verifierStatut()" aria-label="Rafraîchir le statut">↻</button>
+    </div>
+
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

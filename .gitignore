@@ -1,0 +1,39 @@
+# Secrets — NE JAMAIS COMMITTER
+.env
+service_account.json
+credentials.json
+token.pickle
+
+# Dossier sorties temporaires
+sorties/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

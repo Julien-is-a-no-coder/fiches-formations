@@ -1,21 +1,15 @@
-import sys
 import os
+import sys
 from pathlib import Path
 
-# Ajouter la racine du projet au path Python pour permettre les imports absolus
-ROOT = str(Path(__file__).parent.parent)
-if ROOT not in sys.path:
-    sys.path.insert(0, ROOT)
+# On ajoute le dossier racine et le dossier execution au path
+ROOT_DIR = Path(__file__).parent.parent
+sys.path.append(str(ROOT_DIR))
+sys.path.append(str(ROOT_DIR / "execution"))
 
-# Importer l'application Flask
-try:
-    from execution.app import app
-except ImportError as e:
-    print(f"Erreur d'importation : {e}")
-    # Fallback pour tenter l'import direct si le path est différent
-    sys.path.insert(0, os.path.join(ROOT, "execution"))
-    from app import app
+# On importe l'application Flask
+# Vercel cherche une variable nommée 'app' dans api/index.py
+from execution.app import app as application
 
-# Vercel utilise 'app' par défaut, on l'expose
-handler = app
-app = app
+# On l'expose pour Vercel
+app = application

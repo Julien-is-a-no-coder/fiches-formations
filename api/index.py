@@ -1,21 +1,21 @@
-"""
-Entrée Vercel — Sert l'application Flask en mode serverless.
-Ce fichier est le point d'entrée pour Vercel (dossier api/).
-"""
-
 import sys
 import os
 from pathlib import Path
 
-# Ajouter le dossier execution au path Python
-sys.path.insert(0, str(Path(__file__).parent.parent / "execution"))
+# Ajouter la racine du projet au path Python pour permettre les imports absolus
+ROOT = str(Path(__file__).parent.parent)
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
-# Charger les variables d'environnement
-from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent.parent / ".env")
+# Importer l'application Flask
+try:
+    from execution.app import app
+except ImportError as e:
+    print(f"Erreur d'importation : {e}")
+    # Fallback pour tenter l'import direct si le path est différent
+    sys.path.insert(0, os.path.join(ROOT, "execution"))
+    from app import app
 
-# Importer l'application Flask depuis execution/app.py
-from app import app
-
-# Handler Vercel
+# Vercel utilise 'app' par défaut, on l'expose
 handler = app
+app = app

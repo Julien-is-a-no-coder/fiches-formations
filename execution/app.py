@@ -259,7 +259,6 @@ def statut():
         "compte_utilisateur": resultats.get("compte_utilisateur", "Inconnu"),
         "quota_usage": resultats.get("quota_usage", "Inconnu"),
         "modele_doc": resultats.get("modele_doc", "Inconnu"),
-        "debug_env_vars": resultats.get("debug_env_vars", "N/A"),
     }
     return jsonify(diagnostics)
 

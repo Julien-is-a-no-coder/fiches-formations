@@ -28,13 +28,10 @@ TOKEN_PATH = os.getenv("GOOGLE_TOKEN_PATH", "./token.pickle")
 FOLDER_FICHES = os.getenv("DRIVE_FOLDER_FICHES", "1t7JnOY1hO0cMwcCfqLc44eJJ_Mnz--LO")
 MODELE_DOC_ID = os.getenv("DRIVE_MODELE_DOC_ID", "1Ekwki-f3xkUNOyfxd0319GVi7f1g-go6")
 
-# Variables globales pour débugger l'auth sur Vercel
-_DERNIERE_ERREUR_AUTH = None
-_METHODE_AUTH = "Aucune"
+
 
 
 def _obtenir_credentials():
-    global _DERNIERE_ERREUR_AUTH, _METHODE_AUTH
     
     # --- Option 1 : OAuth2 via Env (Priorité pour contourner quota Service Account) ---
     token_b64 = os.getenv("GOOGLE_TOKEN_PICKLE_BASE64")
@@ -50,17 +47,13 @@ def _obtenir_credentials():
                 from google.auth.transport.requests import Request
                 creds.refresh(Request())
             
-            _DERNIERE_ERREUR_AUTH = None
-            _METHODE_AUTH = "Option 1 (Token B64)"
             return creds
         except Exception as e:
-            _DERNIERE_ERREUR_AUTH = f"P1: {str(e)} (Len:{len(token_b64) if token_b64 else 0})"
             print(f"[WARN] Erreur chargement token B64 : {e}")
 
     # --- Option 2 : Service Account (Vercel par défaut) ---
     sa_json_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
     if sa_json_env:
-        _METHODE_AUTH = "Option 2 (SA Env)"
         from google.oauth2 import service_account
         sa_info = json.loads(sa_json_env)
         return service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
@@ -72,10 +65,8 @@ def _obtenir_credentials():
 
     # --- Option 3 : OAuth2 local (credentials.json + token.pickle) ---
     if os.getenv("VERCEL"):
-        _METHODE_AUTH = "Option 3 bloquée (Vercel)"
         return None
 
-    _METHODE_AUTH = "Option 3 (Local)"
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
@@ -338,18 +329,7 @@ def verifier_connexion() -> dict:
     """
     resultats = {}
     
-    # Debug variables d'env (sans afficher les valeurs)
-    vars_env = []
-    if os.getenv("GOOGLE_TOKEN_PICKLE_BASE64"): vars_env.append("TOKEN_B64")
-    if os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT"): vars_env.append("CREDS_JSON")
-    if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT"): vars_env.append("SA_JSON")
-    
-    global _DERNIERE_ERREUR_AUTH, _METHODE_AUTH
-    prefix = f"M:{_METHODE_AUTH} | "
-    if _DERNIERE_ERREUR_AUTH:
-        resultats["debug_env_vars"] = prefix + (", ".join(vars_env) if vars_env else "N/A") + f" (Erreur: {_DERNIERE_ERREUR_AUTH})"
-    else:
-        resultats["debug_env_vars"] = prefix + (", ".join(vars_env) if vars_env else "Aucune détectée")
+    # Vérification Drive
 
     try:
         service = obtenir_service_drive()

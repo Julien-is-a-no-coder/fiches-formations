@@ -31,7 +31,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 from pdf_analyzer import extraire_texte_pdf
 from fiche_generator import generer_fiche_revision, valider_fiche
 from drive_manager import (
-    verifier_connexion, telecharger_modele, uploader_vers_drive_et_convertir
+    verifier_connexion, telecharger_modele, uploader_vers_drive_et_convertir,
+    vider_corbeille, nettoyer_dossier_fiches
 )
 from google_docs_builder import (
     construire_nom_fichier, remplir_docx_local
@@ -167,10 +168,24 @@ def generer():
         )
 
         # C. Upload et conversion
-        doc_info = uploader_vers_drive_et_convertir(
-            str(chemin_final_temp),
-            nom_fichier
-        )
+        try:
+            doc_info = uploader_vers_drive_et_convertir(
+                str(chemin_final_temp),
+                nom_fichier
+            )
+        except Exception as upload_err:
+            # Si erreur de quota, on tente un nettoyage d'urgence et on réessaie une fois
+            if "quota" in str(upload_err).lower() or "403" in str(upload_err):
+                print("⚠️ Quota dépassé détecté. Tentative de nettoyage d'urgence...")
+                nettoyer_dossier_fiches(nb_jours_max=1) # Supprimer ce qui a plus de 24h
+                vider_corbeille()
+                # Réessai final
+                doc_info = uploader_vers_drive_et_convertir(
+                    str(chemin_final_temp),
+                    nom_fichier
+                )
+            else:
+                raise upload_err
         
         doc_id = doc_info["id"]
         etapes.append({
@@ -255,6 +270,19 @@ def statut():
         "modele_doc": os.getenv("DRIVE_MODELE_DOC_ID", "Non configuré"),
     }
     return jsonify(statuts)
+
+
+@app.route("/api/clean", methods=["POST"])
+def clean_drive():
+    """Route manuelle pour vider l'espace du Service Account."""
+    try:
+        nb = nettoyer_dossier_fiches(nb_jours_max=0) # Supprime tout ce qui n'est pas d'aujourd'hui
+        return jsonify({
+            "succes": True, 
+            "message": f"Nettoyage effectué. {nb} fichiers supprimés et corbeille vidée."
+        })
+    except Exception as e:
+        return jsonify({"succes": False, "erreur": str(e)}), 500
 
 
 # ─────────────────────────────────────────────

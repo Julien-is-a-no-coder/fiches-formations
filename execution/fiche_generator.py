@@ -77,10 +77,6 @@ def generer_fiche_revision(
         contenu_tronque += "\n\n[... contenu tronqué pour l'analyse ...]"
 
     prompt = f"""
-{SYSTEME_EXPERT}
-
----
-
 MISSION : Crée une fiche de révision complète et hautement qualitative pour la séance suivante.
 
 INFORMATIONS DE LA SÉANCE :
@@ -149,32 +145,53 @@ RÉPONDS UNIQUEMENT avec un JSON valide, sans markdown au format EXACT suivant :
 """
 
     try:
-        modele = genai.GenerativeModel("models/gemini-2.5-flash")
+        # Utilisation du modèle spécifié par l'utilisateur
+        modele = genai.GenerativeModel(
+            model_name="gemini-2.5-flash",
+            system_instruction=SYSTEME_EXPERT
+        )
+        
         reponse = modele.generate_content(
             prompt,
             generation_config=genai.GenerationConfig(
-                temperature=0.3, # Baisse de la créativité pour plus de stabilité JSON
+                temperature=0.2, # Température basse pour limiter les déviances JSON
                 max_output_tokens=8192,
                 response_mime_type="application/json",
             )
         )
+        
+        if not reponse or not reponse.text:
+            raise RuntimeError("Gemini n'a renvoyé aucune réponse (texte vide).")
+
         texte = reponse.text.strip()
 
-        # En principe response_mime_type garantit un JSON pur, mais sécurité supplémentaire :
+        # Nettoyage si jamais le modèle force des backticks malgré response_mime_type
         if texte.startswith("```json"):
             texte = texte[7:].strip()
+        elif texte.startswith("```"):
+            texte = texte[3:].strip()
         if texte.endswith("```"):
             texte = texte[:-3].strip()
 
-        fiche = json.loads(texte)
-        return fiche
+        try:
+            fiche = json.loads(texte)
+            return fiche
+        except json.JSONDecodeError as decode_error:
+            # Si le JSON est tronqué, on tente une réparation basique ou on loggue la fin
+            longueur = len(texte)
+            fin = texte[-100:] if longueur > 100 else texte
+            print(f"❌ Erreur JSON (Longueur: {longueur} chars). Fin de réponse : {fin}")
+            
+            # Message plus parlant pour l'utilisateur
+            msg = f"Réponse Gemini tronquée ou malformée ({longueur} chars)."
+            if "Unterminated string" in str(decode_error):
+                msg += " Une chaîne de caractères n'a pas été fermée. Essayez un PDF plus court."
+            
+            raise RuntimeError(f"{msg} Détail: {decode_error}") from decode_error
 
-    except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f"La réponse Gemini n'est pas un JSON valide : {e}\n"
-            f"Réponse reçue : {texte[:500]}"
-        ) from e
     except Exception as e:
+        if "google.api_core.exceptions.InvalidArgument" in str(e):
+            raise RuntimeError(f"Modèle Gemini non trouvé ou invalide : {e}")
         raise RuntimeError(f"Erreur lors de la génération Gemini : {e}") from e
 
 
@@ -205,11 +222,14 @@ def valider_fiche(fiche: dict) -> dict:
 if __name__ == "__main__":
     # Test de connexion Gemini
     if not GEMINI_API_KEY:
-        print("❌ GEMINI_API_KEY manquante dans .env")
+        print("[!] GEMINI_API_KEY manquante dans .env")
     else:
-        print("✅ API Gemini configurée")
-        contenu_test = """Introduction à l'IA en RH. Séance 1 : Définitions et enjeux.
+        print("[OK] API Gemini configuree")
+        contenu_test = """Introduction a l'IA en RH. Seance 1 : Definitions et enjeux.
         L'intelligence artificielle est la simulation de processus d'intelligence humaine par des machines.
-        Outils étudiés : ChatGPT, Copilot, Claude. Cas pratique : Rédaction d'une offre d'emploi avec ChatGPT."""
-        fiche = generer_fiche_revision(contenu_test, "IA pour les RH - Séance 1", "Bachelor RH", "16/03/2026")
-        print(json.dumps(fiche, ensure_ascii=False, indent=2))
+        Outils etudies : ChatGPT, Copilot, Claude. Cas pratique : Redaction d'une offre d'emploi avec ChatGPT."""
+        try:
+            fiche = generer_fiche_revision(contenu_test, "IA pour les RH - Seance 1", "Bachelor RH", "16/03/2026")
+            print(json.dumps(fiche, ensure_ascii=False, indent=2))
+        except Exception as e:
+            print(f"[ERROR] {e}")

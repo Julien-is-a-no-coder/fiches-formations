@@ -226,6 +226,60 @@ def uploader_vers_drive_et_convertir(
     }
 
 
+def vider_corbeille() -> bool:
+    """
+    Vide définitivement la corbeille du compte (Service Account).
+    Essentiel pour libérer de l'espace sur un compte saturé.
+    """
+    try:
+        service = obtenir_service_drive()
+        service.files().emptyTrash().execute()
+        return True
+    except Exception as e:
+        print(f"[ERROR] Impossible de vider la corbeille : {e}")
+        return False
+
+
+def nettoyer_dossier_fiches(nb_jours_max: int = 2) -> int:
+    """
+    Supprime les fichiers du dossier fiches ayant plus de X jours.
+    Ceci libère le quota du Service Account.
+    """
+    from datetime import datetime, timedelta, timezone
+    
+    service = obtenir_service_drive()
+    folder = FOLDER_FICHES
+    
+    # Calculer la date limite
+    date_limite = datetime.now(timezone.utc) - timedelta(days=nb_jours_max)
+    date_limite_str = date_limite.isoformat()
+
+    try:
+        # Lister les fichiers dans le dossier
+        query = f"'{folder}' in parents and trashed = false and createdTime < '{date_limite_str}'"
+        resultats = service.files().list(
+            q=query,
+            fields="files(id, name, createdTime)",
+            pageSize=50
+        ).execute()
+
+        fichiers = resultats.get("files", [])
+        nb_supprimes = 0
+
+        for f in fichiers:
+            service.files().delete(fileId=f["id"]).execute()
+            nb_supprimes += 1
+            
+        # Toujours vider la corbeille après suppression
+        if nb_supprimes > 0:
+            vider_corbeille()
+            
+        return nb_supprimes
+    except Exception as e:
+        print(f"[ERROR] Erreur lors du nettoyage : {e}")
+        return 0
+
+
 def verifier_connexion() -> dict:
     """
     Vérifie que l'authentification Drive fonctionne et que les ressources sont accessibles.

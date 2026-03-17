@@ -8,6 +8,7 @@ et Service Account en production Vercel (GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT).
 import os
 import json
 import pickle
+import base64
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -54,9 +55,6 @@ def _obtenir_credentials():
         return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
 
     # --- Option 2bis : OAuth2 via Env (Vercel avec compte utilisateur) ---
-    import base64
-    import pickle
-    import json
     token_b64 = os.getenv("GOOGLE_TOKEN_PICKLE_BASE64")
     if token_b64:
         try:

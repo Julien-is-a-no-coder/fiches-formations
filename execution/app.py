@@ -253,6 +253,7 @@ def statut():
         "serveur": "✅ En ligne",
         "gemini_api": "✅ Configurée" if gemini_ok else "❌ GEMINI_API_KEY manquante",
         "google_drive": resultats.get("drive_connexion", "Inconnu"),
+        "compte_utilisateur": resultats.get("compte_utilisateur", "Inconnu"),
         "dossier_cible": resultats.get("dossier_cible", "Inconnu"),
         "quota_usage": resultats.get("quota_usage", "Inconnu"),
         "modele_doc": resultats.get("modele_doc", "Inconnu"),

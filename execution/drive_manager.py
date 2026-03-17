@@ -292,22 +292,26 @@ def nettoyer_dossier_fiches(nb_jours_max: int = 2) -> int:
         return 0
 
 
-def obtenir_quota_usage() -> str:
-    """Récupère l'état du quota du compte."""
+def obtenir_quota_usage() -> tuple[str, str]:
+    """Récupère l'état du quota et l'email du compte."""
     try:
         service = obtenir_service_drive()
-        about = service.about().get(fields="storageQuota").execute()
+        about = service.about().get(fields="user, storageQuota").execute()
+        user = about.get("user", {}).get("emailAddress", "Inconnu")
         quota = about.get("storageQuota", {})
         limit = int(quota.get("limit", 0))
         usage = int(quota.get("usage", 0))
         
+        info = ""
         if limit > 0:
             pourcentage = (usage / limit) * 100
-            return f"{usage / (1024**2):.1f}MB / {limit / (1024**2):.1f}MB ({pourcentage:.1f}%)"
+            info = f"{usage / (1024**2):.1f}MB / {limit / (1024**2):.1f}MB ({pourcentage:.1f}%)"
         else:
-            return f"{usage / (1024**2):.1f}MB / Illimité"
+            info = f"{usage / (1024**2):.1f}MB / Illimité"
+        
+        return user, info
     except Exception as e:
-        return f"Erreur quota : {e}"
+        return "Erreur", f"Erreur quota : {e}"
 
 
 def verifier_connexion() -> dict:
@@ -325,7 +329,10 @@ def verifier_connexion() -> dict:
         dossier = service.files().get(fileId=FOLDER_FICHES, fields="id,name").execute()
         resultats["drive_connexion"] = "✅ Connecté"
         resultats["dossier_cible"] = f"✅ Accessible ({dossier.get('name', FOLDER_FICHES)})"
-        resultats["quota_usage"] = obtenir_quota_usage()
+        
+        email, quota = obtenir_quota_usage()
+        resultats["compte_utilisateur"] = email
+        resultats["quota_usage"] = quota
     except FileNotFoundError as e:
         resultats["drive_connexion"] = f"❌ Config absente : {e}"
         return resultats
@@ -333,6 +340,7 @@ def verifier_connexion() -> dict:
         resultats["drive_connexion"] = f"❌ Erreur : {e}"
         resultats["dossier_cible"] = "⚠️ Non vérifié"
         resultats["quota_usage"] = "⚠️ Non vérifié"
+        resultats["compte_utilisateur"] = "⚠️ Non vérifié"
 
     # Test accès modèle Google Doc
     try:

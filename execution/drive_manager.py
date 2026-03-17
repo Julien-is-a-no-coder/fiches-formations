@@ -260,8 +260,9 @@ def nettoyer_dossier_fiches(nb_jours_max: int = 2) -> int:
     date_limite_str = date_limite.isoformat().replace("+00:00", "Z")
 
     try:
-        # Lister les fichiers dans le dossier
-        query = f"'{folder}' in parents and trashed = false and createdTime < '{date_limite_str}'"
+        # Lister TOUS les fichiers appartenant au compte (pas seulement un dossier)
+        # pour libérer le quota global du Service Account.
+        query = f"trashed = false and 'me' in owners and createdTime < '{date_limite_str}'"
         nb_supprimes = 0
         
         # Pagination pour tout supprimer

@@ -7,6 +7,7 @@ Usage  : python execution/app.py
 Accès  : http://localhost:5001
 """
 
+# v1.1.2 - Trigger redeploy pour variables d'env
 import os
 import sys
 import tempfile

@@ -250,34 +250,64 @@ def nettoyer_dossier_fiches(nb_jours_max: int = 2) -> int:
     service = obtenir_service_drive()
     folder = FOLDER_FICHES
     
-    # Calculer la date limite
+    # Calculer la date limite (si nb_jours_max=0, on prend l'instant t)
+    # On ajoute une petite marge pour éviter de supprimer le fichier en cours
     date_limite = datetime.now(timezone.utc) - timedelta(days=nb_jours_max)
-    date_limite_str = date_limite.isoformat()
+    if nb_jours_max == 0:
+        # Si on veut TOUT supprimer, on prend ce qui a plus de 1 minute
+        date_limite = datetime.now(timezone.utc) - timedelta(minutes=1)
+    
+    date_limite_str = date_limite.isoformat().replace("+00:00", "Z")
 
     try:
         # Lister les fichiers dans le dossier
         query = f"'{folder}' in parents and trashed = false and createdTime < '{date_limite_str}'"
-        resultats = service.files().list(
-            q=query,
-            fields="files(id, name, createdTime)",
-            pageSize=50
-        ).execute()
-
-        fichiers = resultats.get("files", [])
         nb_supprimes = 0
+        
+        # Pagination pour tout supprimer
+        page_token = None
+        while True:
+            resultats = service.files().list(
+                q=query,
+                fields="nextPageToken, files(id, name, createdTime)",
+                pageSize=100,
+                pageToken=page_token
+            ).execute()
 
-        for f in fichiers:
-            service.files().delete(fileId=f["id"]).execute()
-            nb_supprimes += 1
+            fichiers = resultats.get("files", [])
+            for f in fichiers:
+                service.files().delete(fileId=f["id"]).execute()
+                nb_supprimes += 1
             
-        # Toujours vider la corbeille après suppression
-        if nb_supprimes > 0:
-            vider_corbeille()
+            page_token = resultats.get("nextPageToken")
+            if not page_token:
+                break
+            
+        # Toujours vider la corbeille si on a supprimé
+        vider_corbeille()
             
         return nb_supprimes
     except Exception as e:
         print(f"[ERROR] Erreur lors du nettoyage : {e}")
         return 0
+
+
+def obtenir_quota_usage() -> str:
+    """Récupère l'état du quota du compte."""
+    try:
+        service = obtenir_service_drive()
+        about = service.about().get(fields="storageQuota").execute()
+        quota = about.get("storageQuota", {})
+        limit = int(quota.get("limit", 0))
+        usage = int(quota.get("usage", 0))
+        
+        if limit > 0:
+            pourcentage = (usage / limit) * 100
+            return f"{usage / (1024**2):.1f}MB / {limit / (1024**2):.1f}MB ({pourcentage:.1f}%)"
+        else:
+            return f"{usage / (1024**2):.1f}MB / Illimité"
+    except Exception as e:
+        return f"Erreur quota : {e}"
 
 
 def verifier_connexion() -> dict:
@@ -295,12 +325,14 @@ def verifier_connexion() -> dict:
         dossier = service.files().get(fileId=FOLDER_FICHES, fields="id,name").execute()
         resultats["drive_connexion"] = "✅ Connecté"
         resultats["dossier_cible"] = f"✅ Accessible ({dossier.get('name', FOLDER_FICHES)})"
+        resultats["quota_usage"] = obtenir_quota_usage()
     except FileNotFoundError as e:
         resultats["drive_connexion"] = f"❌ Config absente : {e}"
         return resultats
     except Exception as e:
         resultats["drive_connexion"] = f"❌ Erreur : {e}"
         resultats["dossier_cible"] = "⚠️ Non vérifié"
+        resultats["quota_usage"] = "⚠️ Non vérifié"
 
     # Test accès modèle Google Doc
     try:

@@ -336,6 +336,13 @@ def verifier_connexion() -> dict:
         dict: Résultats des vérifications
     """
     resultats = {}
+    
+    # Debug variables d'env (sans afficher les valeurs)
+    vars_env = []
+    if os.getenv("GOOGLE_TOKEN_PICKLE_BASE64"): vars_env.append("TOKEN_B64")
+    if os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT"): vars_env.append("CREDS_JSON")
+    if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT"): vars_env.append("SA_JSON")
+    resultats["debug_env_vars"] = ", ".join(vars_env) if vars_env else "Aucune détectée"
 
     try:
         service = obtenir_service_drive()

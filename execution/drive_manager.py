@@ -33,28 +33,11 @@ def _obtenir_credentials():
     """
     Obtient les credentials Google.
     Priorité :
-      1. Service Account JSON (variable d'env — production Vercel)
-      2. OAuth2 token.pickle + credentials.json (développement local)
-
-    Retourne:
-        google credentials
-
-    Lève:
-        FileNotFoundError: Si aucune configuration n'est trouvée
+      1. OAuth2 token.pickle (Base64) + credentials.json (variable d'env — FALLBACK QUOTA)
+      2. Service Account JSON (variable d'env — production Vercel)
+      3. OAuth2 local token.pickle + credentials.json (développement local)
     """
-    # --- Option 1 : Service Account (Vercel) ---
-    sa_json_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
-    if sa_json_env:
-        from google.oauth2 import service_account
-        sa_info = json.loads(sa_json_env)
-        return service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
-
-    sa_fichier = Path(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service_account.json"))
-    if sa_fichier.exists():
-        from google.oauth2 import service_account
-        return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
-
-    # --- Option 2bis : OAuth2 via Env (Vercel avec compte utilisateur) ---
+    # --- Option 1 : OAuth2 via Env (Priorité pour contourner quota Service Account) ---
     token_b64 = os.getenv("GOOGLE_TOKEN_PICKLE_BASE64")
     if token_b64:
         try:
@@ -70,6 +53,18 @@ def _obtenir_credentials():
             return creds
         except Exception as e:
             print(f"[WARN] Erreur chargement token B64 : {e}")
+
+    # --- Option 2 : Service Account (Vercel par défaut) ---
+    sa_json_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
+    if sa_json_env:
+        from google.oauth2 import service_account
+        sa_info = json.loads(sa_json_env)
+        return service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
+
+    sa_fichier = Path(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "./service_account.json"))
+    if sa_fichier.exists():
+        from google.oauth2 import service_account
+        return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
 
     # --- Option 2 : OAuth2 local (credentials.json + token.pickle) ---
     from google.oauth2.credentials import Credentials

@@ -28,6 +28,9 @@ TOKEN_PATH = os.getenv("GOOGLE_TOKEN_PATH", "./token.pickle")
 FOLDER_FICHES = os.getenv("DRIVE_FOLDER_FICHES", "1t7JnOY1hO0cMwcCfqLc44eJJ_Mnz--LO")
 MODELE_DOC_ID = os.getenv("DRIVE_MODELE_DOC_ID", "1Ekwki-f3xkUNOyfxd0319GVi7f1g-go6")
 
+# Variable globale pour débugger l'auth sur Vercel
+_DERNIERE_ERREUR_AUTH = None
+
 
 def _obtenir_credentials():
     """
@@ -52,6 +55,8 @@ def _obtenir_credentials():
             
             return creds
         except Exception as e:
+            global _DERNIERE_ERREUR_AUTH
+            _DERNIERE_ERREUR_AUTH = str(e)
             print(f"[WARN] Erreur chargement token B64 : {e}")
 
     # --- Option 2 : Service Account (Vercel par défaut) ---
@@ -342,7 +347,12 @@ def verifier_connexion() -> dict:
     if os.getenv("GOOGLE_TOKEN_PICKLE_BASE64"): vars_env.append("TOKEN_B64")
     if os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT"): vars_env.append("CREDS_JSON")
     if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT"): vars_env.append("SA_JSON")
-    resultats["debug_env_vars"] = ", ".join(vars_env) if vars_env else "Aucune détectée"
+    
+    global _DERNIERE_ERREUR_AUTH
+    if _DERNIERE_ERREUR_AUTH:
+        resultats["debug_env_vars"] = (", ".join(vars_env) if vars_env else "N/A") + f" (Erreur: {_DERNIERE_ERREUR_AUTH})"
+    else:
+        resultats["debug_env_vars"] = ", ".join(vars_env) if vars_env else "Aucune détectée"
 
     try:
         service = obtenir_service_drive()

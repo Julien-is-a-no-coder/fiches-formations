@@ -28,7 +28,7 @@ TOKEN_PATH = os.getenv("GOOGLE_TOKEN_PATH", "./token.pickle")
 FOLDER_FICHES = os.getenv("DRIVE_FOLDER_FICHES", "1t7JnOY1hO0cMwcCfqLc44eJJ_Mnz--LO")
 MODELE_DOC_ID = os.getenv("DRIVE_MODELE_DOC_ID", "1Ekwki-f3xkUNOyfxd0319GVi7f1g-go6")
 
-# Variable globale pour débugger l'auth sur Vercel
+# Variables globales pour débugger l'auth sur Vercel
 _DERNIERE_ERREUR_AUTH = None
 _METHODE_AUTH = "Aucune"
 
@@ -78,35 +78,35 @@ def _obtenir_credentials():
         from google.oauth2 import service_account
         return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
 
-    # --- Option 2 : OAuth2 local (credentials.json + token.pickle) ---
+    # --- Option 3 : OAuth2 local (credentials.json + token.pickle) ---
+    # Cette partie ne doit idéalement pas être exécutée sur Vercel car InstalledAppFlow
+    # essaie d'ouvrir un navigateur, ce qui fait crasher la fonction serverless.
+    global _METHODE_AUTH
+    if os.getenv("VERCEL"):
+        _METHODE_AUTH = "Option 3 bloquée (Vercel)"
+        return None
+
+    _METHODE_AUTH = "Option 3 (Local)"
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow
     from google.auth.transport.requests import Request
 
     creds = None
-
-    # Charger le token sauvegardé
     token = Path(TOKEN_PATH)
     if token.exists():
         with open(str(token), "rb") as f:
             creds = pickle.load(f)
 
-    # Rafraîchir ou re-authentifier si nécessaire
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             credentials_path = Path(CREDENTIALS_PATH)
             if not credentials_path.exists():
-                raise FileNotFoundError(
-                    f"Aucune configuration Google trouvée.\n"
-                    f"Attendu : credentials.json à '{CREDENTIALS_PATH}'\n"
-                    "Consultez le README pour configurer l'accès Google."
-                )
+                return None
             flow = InstalledAppFlow.from_client_secrets_file(str(credentials_path), SCOPES)
             creds = flow.run_local_server(port=0)
 
-        # Sauvegarder le token
         with open(TOKEN_PATH, "wb") as f:
             pickle.dump(creds, f)
 

@@ -11,6 +11,8 @@ import os
 import sys
 import tempfile
 import shutil
+import time
+import json
 
 # Configuration des logs
 import logging
@@ -282,10 +284,11 @@ def clean_drive():
 def test_upload():
     """Route secrète pour tester l'upload d'un petit fichier Docx."""
     try:
-        # Créer un mini-fichier de test
-        chemin_test = Path("temp_test.docx")
+        # Créer un mini-fichier de test dans /tmp/
+        nom_temp = "temp_test_quota.docx"
+        chemin_test = Path("/tmp") / nom_temp
         with open(chemin_test, "w") as f:
-            f.write("Test de quota Drive sur Vercel.")
+            f.write("Test de quota Drive sur Vercel - " + str(time.time()))
         
         # Tenter l'upload
         res = uploader_vers_drive_et_convertir(str(chemin_test), "Test Vercel Quota")

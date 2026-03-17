@@ -30,6 +30,7 @@ MODELE_DOC_ID = os.getenv("DRIVE_MODELE_DOC_ID", "1Ekwki-f3xkUNOyfxd0319GVi7f1g-
 
 # Variable globale pour débugger l'auth sur Vercel
 _DERNIERE_ERREUR_AUTH = None
+_METHODE_AUTH = "Aucune"
 
 
 def _obtenir_credentials():
@@ -54,15 +55,20 @@ def _obtenir_credentials():
                 from google.auth.transport.requests import Request
                 creds.refresh(Request())
             
+            global _DERNIERE_ERREUR_AUTH, _METHODE_AUTH
+            _DERNIERE_ERREUR_AUTH = None
+            _METHODE_AUTH = "Option 1 (Token B64)"
             return creds
         except Exception as e:
             global _DERNIERE_ERREUR_AUTH
-            _DERNIERE_ERREUR_AUTH = str(e)
+            _DERNIERE_ERREUR_AUTH = f"P1: {str(e)}"
             print(f"[WARN] Erreur chargement token B64 : {e}")
 
     # --- Option 2 : Service Account (Vercel par défaut) ---
     sa_json_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
     if sa_json_env:
+        global _METHODE_AUTH
+        _METHODE_AUTH = "Option 2 (SA Env)"
         from google.oauth2 import service_account
         sa_info = json.loads(sa_json_env)
         return service_account.Credentials.from_service_account_info(sa_info, scopes=SCOPES)
@@ -349,11 +355,12 @@ def verifier_connexion() -> dict:
     if os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT"): vars_env.append("CREDS_JSON")
     if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT"): vars_env.append("SA_JSON")
     
-    global _DERNIERE_ERREUR_AUTH
+    global _DERNIERE_ERREUR_AUTH, _METHODE_AUTH
+    prefix = f"M:{_METHODE_AUTH} | "
     if _DERNIERE_ERREUR_AUTH:
-        resultats["debug_env_vars"] = (", ".join(vars_env) if vars_env else "N/A") + f" (Erreur: {_DERNIERE_ERREUR_AUTH})"
+        resultats["debug_env_vars"] = prefix + (", ".join(vars_env) if vars_env else "N/A") + f" (Erreur: {_DERNIERE_ERREUR_AUTH})"
     else:
-        resultats["debug_env_vars"] = ", ".join(vars_env) if vars_env else "Aucune détectée"
+        resultats["debug_env_vars"] = prefix + (", ".join(vars_env) if vars_env else "Aucune détectée")
 
     try:
         service = obtenir_service_drive()

@@ -34,13 +34,8 @@ _METHODE_AUTH = "Aucune"
 
 
 def _obtenir_credentials():
-    """
-    Obtient les credentials Google.
-    Priorité :
-      1. OAuth2 token.pickle (Base64) + credentials.json (variable d'env — FALLBACK QUOTA)
-      2. Service Account JSON (variable d'env — production Vercel)
-      3. OAuth2 local token.pickle + credentials.json (développement local)
-    """
+    global _DERNIERE_ERREUR_AUTH, _METHODE_AUTH
+    
     # --- Option 1 : OAuth2 via Env (Priorité pour contourner quota Service Account) ---
     token_b64 = os.getenv("GOOGLE_TOKEN_PICKLE_BASE64")
     if token_b64:
@@ -55,19 +50,16 @@ def _obtenir_credentials():
                 from google.auth.transport.requests import Request
                 creds.refresh(Request())
             
-            global _DERNIERE_ERREUR_AUTH, _METHODE_AUTH
             _DERNIERE_ERREUR_AUTH = None
             _METHODE_AUTH = "Option 1 (Token B64)"
             return creds
         except Exception as e:
-            global _DERNIERE_ERREUR_AUTH
             _DERNIERE_ERREUR_AUTH = f"P1: {str(e)}"
             print(f"[WARN] Erreur chargement token B64 : {e}")
 
     # --- Option 2 : Service Account (Vercel par défaut) ---
     sa_json_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
     if sa_json_env:
-        global _METHODE_AUTH
         _METHODE_AUTH = "Option 2 (SA Env)"
         from google.oauth2 import service_account
         sa_info = json.loads(sa_json_env)
@@ -79,9 +71,6 @@ def _obtenir_credentials():
         return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
 
     # --- Option 3 : OAuth2 local (credentials.json + token.pickle) ---
-    # Cette partie ne doit idéalement pas être exécutée sur Vercel car InstalledAppFlow
-    # essaie d'ouvrir un navigateur, ce qui fait crasher la fonction serverless.
-    global _METHODE_AUTH
     if os.getenv("VERCEL"):
         _METHODE_AUTH = "Option 3 bloquée (Vercel)"
         return None

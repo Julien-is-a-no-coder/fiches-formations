@@ -53,6 +53,26 @@ def _obtenir_credentials():
         from google.oauth2 import service_account
         return service_account.Credentials.from_service_account_file(str(sa_fichier), scopes=SCOPES)
 
+    # --- Option 2bis : OAuth2 via Env (Vercel avec compte utilisateur) ---
+    import base64
+    import pickle
+    import json
+    token_b64 = os.getenv("GOOGLE_TOKEN_PICKLE_BASE64")
+    if token_b64:
+        try:
+            token_data = base64.b64decode(token_b64)
+            creds = pickle.loads(token_data)
+            
+            # Rafraîchir si nécessaire (besoin de credentials.json en env aussi pour refresh)
+            creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON_CONTENT")
+            if creds_json and (not creds.valid or (creds.expired and creds.refresh_token)):
+                from google.auth.transport.requests import Request
+                creds.refresh(Request())
+            
+            return creds
+        except Exception as e:
+            print(f"[WARN] Erreur chargement token B64 : {e}")
+
     # --- Option 2 : OAuth2 local (credentials.json + token.pickle) ---
     from google.oauth2.credentials import Credentials
     from google_auth_oauthlib.flow import InstalledAppFlow

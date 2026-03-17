@@ -243,33 +243,21 @@ def generer():
 @app.route("/api/statut")
 def statut():
     """Vérifie que le serveur et les dépendances sont opérationnels."""
-    # Racine du projet (un niveau au-dessus de /execution/)
-    racine = Path(__file__).parent.parent
+    # Diagnostic centralisé via drive_manager
+    resultats = verifier_connexion()
+    
+    # Complément local
     gemini_ok = bool(os.getenv("GEMINI_API_KEY"))
-    sa_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_CONTENT")
-    sa_fichier = (racine / "service_account.json").exists()
-    token_pickle = (racine / "token.pickle").exists()
-    credentials_json = (racine / "credentials.json").exists()
-
-    if sa_env:
-        drive_statut = "✅ Via variable d'environnement (Service Account)"
-    elif sa_fichier:
-        drive_statut = "✅ service_account.json présent"
-    elif token_pickle and credentials_json:
-        drive_statut = "✅ OAuth2 (credentials.json + token.pickle)"
-    elif credentials_json:
-        drive_statut = "⚠️ credentials.json présent — token.pickle manquant"
-    else:
-        drive_statut = "❌ Aucune configuration Google trouvée"
-
-    statuts = {
+    
+    diagnostics = {
         "serveur": "✅ En ligne",
         "gemini_api": "✅ Configurée" if gemini_ok else "❌ GEMINI_API_KEY manquante",
-        "google_drive": drive_statut,
-        "dossier_cible": os.getenv("DRIVE_FOLDER_FICHES", "Non configuré"),
-        "modele_doc": os.getenv("DRIVE_MODELE_DOC_ID", "Non configuré"),
+        "google_drive": resultats.get("drive_connexion", "Inconnu"),
+        "dossier_cible": resultats.get("dossier_cible", "Inconnu"),
+        "quota_usage": resultats.get("quota_usage", "Inconnu"),
+        "modele_doc": resultats.get("modele_doc", "Inconnu"),
     }
-    return jsonify(statuts)
+    return jsonify(diagnostics)
 
 
 @app.route("/api/clean", methods=["POST"])

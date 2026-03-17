@@ -278,6 +278,27 @@ def clean_drive():
 # Lancement
 # ─────────────────────────────────────────────
 
+@app.route("/api/test_upload", methods=["POST"])
+def test_upload():
+    """Route secrète pour tester l'upload d'un petit fichier Docx."""
+    try:
+        # Créer un mini-fichier de test
+        chemin_test = Path("temp_test.docx")
+        with open(chemin_test, "w") as f:
+            f.write("Test de quota Drive sur Vercel.")
+        
+        # Tenter l'upload
+        res = uploader_vers_drive_et_convertir(str(chemin_test), "Test Vercel Quota")
+        
+        # Nettoyer
+        if chemin_test.exists():
+            chemin_test.unlink()
+            
+        return jsonify({"succes": True, "result": res})
+    except Exception as e:
+        return jsonify({"succes": False, "erreur": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("=" * 60)
     print("  🎓 Générateur de Fiches de Révision")

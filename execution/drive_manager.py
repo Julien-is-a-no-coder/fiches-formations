@@ -43,6 +43,7 @@ def _obtenir_credentials():
     # --- Option 1 : OAuth2 via Env (Priorité pour contourner quota Service Account) ---
     token_b64 = os.getenv("GOOGLE_TOKEN_PICKLE_BASE64")
     if token_b64:
+        token_b64 = token_b64.strip()
         try:
             token_data = base64.b64decode(token_b64)
             creds = pickle.loads(token_data)

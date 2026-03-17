@@ -54,7 +54,7 @@ def _obtenir_credentials():
             _METHODE_AUTH = "Option 1 (Token B64)"
             return creds
         except Exception as e:
-            _DERNIERE_ERREUR_AUTH = f"P1: {str(e)}"
+            _DERNIERE_ERREUR_AUTH = f"P1: {str(e)} (Len:{len(token_b64) if token_b64 else 0})"
             print(f"[WARN] Erreur chargement token B64 : {e}")
 
     # --- Option 2 : Service Account (Vercel par défaut) ---
